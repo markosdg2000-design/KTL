@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kaizen Task Logger</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link rel="icon" type="image/png" href="https://www.kaizen.com/content/dam/kaizen/global/images/favicon-32x32.png">
+  <link rel="apple-touch-icon" href="https://www.kaizen.com/content/dam/kaizen/global/images/favicon-180x180.png">
+  <meta name="theme-color" content="#103273">
+  <style>
+    :root {
+      --kaizen-blue: #103273;
+      --kaizen-red: #a90533;
+      --kaizen-light-blue: #00a3c2;
+      --kaizen-very-light-blue: #45c1f1;
+      --grey-dark: #505050;
+      --grey-mid: #737373;
+      --grey-soft: #bdbdbd;
+      --grey-bg: #e4e4e4;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: radial-gradient(circle at top, #ffffff 0%, #eef3f7 40%, #d5edf9 100%);
+      margin: 0;
+      color: #0b1420;
+    }
+
+    header {
+      background: var(--kaizen-blue);
+      color: #fff;
+      padding: 10px 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-left img {
+      height: 34px;
+      object-fit: contain;
+    }
+    header h1 {
+      font-size: 16px;
+      margin: 0;
+      letter-spacing: 0.05em;
+    }
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    #processNameInput {
+      padding: 5px 10px;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 4px;
+      font-size: 12px;
+      max-width: 170px;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+    #processNameInput::placeholder { color: rgba(255,255,255,0.6); }
+    #timerDisplay {
+      font-size: 20px;
+      font-weight: bold;
+      background: rgba(0,0,0,0.25);
+      padding: 4px 12px;
+      border-radius: 999px;
+    }
+
+    .btn {
+      background: var(--kaizen-red);
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: transform .05s ease-in, box-shadow .05s ease-in;
+      box-shadow: 0 2px 3px rgba(0,0,0,0.15);
+    }
+    .btn:active { transform: scale(0.97); }
+
+    .container {
+      padding: 12px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 10px 10px 0 0;
+      overflow: hidden;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    }
+    th {
+      background: #f2f5f9;
+      color: var(--grey-dark);
+      text-align: left;
+      font-size: 12px;
+      letter-spacing: 0.03em;
+    }
+    th, td {
+      border: 1px solid #e7edf2;
+      padding: 6px;
+      font-size: 13px;
+      vertical-align: middle;
+    }
+    tbody tr:nth-child(even) { background: #f9fafe; }
+
+    .row-btn { display: flex; gap: 4px; flex-wrap: wrap; }
+
+    .mini-btn {
+      background: var(--kaizen-blue);
+      color: #fff;
+      border: none;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .mini-btn.del { background: #c0392b; }
+    .mini-btn.mv { background: var(--kaizen-light-blue); }
+
+    .tag-btn {
+      background: #e4e4e4;
+      color: #103273;
+      border: none;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .tag-btn.active.va { background: #00a3c2; color: #fff; }
+    .tag-btn.active.muda { background: #a90533; color: #fff; }
+
+    .add-bottom {
+      margin-top: 10px;
+      background: var(--kaizen-red);
+      width: fit-content;
+      display: inline-block;
+      border-radius: 999px;
+      padding-inline: 18px;
+    }
+
+    #personModal {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.2); display: none;
+      justify-content: center; align-items: center; z-index: 999;
+    }
+    #personModalContent {
+      background: #fff; padding: 20px; border-radius: 12px;
+      width: 300px; box-shadow: 0 0 15px rgba(0,0,0,0.2);
+      border-top: 5px solid var(--kaizen-blue);
+    }
+    #personModalContent h2 { margin-top: 0; color: var(--kaizen-blue); }
+    #personList li {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 5px; border-bottom: 1px solid #eee;
+      padding-bottom: 3px; font-size: 13px;
+    }
+
+    @media (max-width: 700px) {
+      header { flex-direction: column; align-items: flex-start; }
+      .header-controls { width: 100%; justify-content: flex-start; }
+      #processNameInput,
+      #startBtn,
+      #managePeopleBtn,
+      #chooseDirBtn,
+      #stopAllBtn { width: 100%; }
+      #timerDisplay { order: -1; margin-bottom: 4px; }
+
+      th { display: none; }
+      table, tbody, tr, td { display: block; width: 100%; }
+      tr {
+        background: #fff; margin-bottom: 12px; border: 1px solid #dce4eb;
+        border-radius: 10px; padding: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+      }
+      td { border: none; padding: 4px 2px; }
+      td[data-role="tarea"] {
+        font-weight: bold; font-size: 14px; margin-bottom: 4px; color: var(--kaizen-blue);
+      }
+      .mobile-row {
+        display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 4px;
+      }
+      .mobile-row small { font-size: 11px; color: #333; }
+      .mobile-row .row-btn { margin-left: auto; }
+      td[data-role="comentario"] input { width: 100%; }
+
+      .add-bottom {
+        position: sticky; bottom: 0; width: 100%; text-align: center; z-index: 5; border-radius: 999px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <img src="https://www.kaizen.com/content/dam/kaizen/global/images/kaizen-logo.svg" alt="Kaizen Institute" onerror="this.style.display='none'">
+      <h1>REGISTRO DE TAREAS</h1>
+    </div>
+    <div class="header-controls">
+      <input id="processNameInput" type="text" placeholder="Nombre del proceso" />
+      <div id="timerDisplay">00:00:00</div>
+      <button id="startBtn" class="btn" style="background:#45c1f1;">▶ START</button>
+      <button id="managePeopleBtn" class="btn" style="background:#00a3c2;">👥 Personas</button>
+      <button id="chooseDirBtn" class="btn" style="background:#737373;">📁 Carpeta</button>
+      <button id="stopAllBtn" class="btn">■ STOP / DESCARGAR</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <table id="tasksTable">
+      <thead>
+        <tr>
+          <th>Persona</th>
+          <th>Tarea</th>
+          <th>Tipo</th>
+          <th>Comentario</th>
+          <th>Inicio</th>
+          <th>Fin</th>
+          <th>Play/Stop</th>
+          <th>Orden</th>
+        </tr>
+      </thead>
+      <tbody id="tasksBody"></tbody>
+    </table>
+    <button id="addTaskBtn" class="btn add-bottom">Añadir tarea</button>
+  </div>
+
+  <datalist id="taskList"></datalist>
+
+  <div id="personModal">
+    <div id="personModalContent">
+      <h2>Gestión de personas</h2>
+      <input type="text" id="newPersonName" placeholder="Nombre nuevo" style="width:100%;padding:6px;">
+      <button id="addPersonBtn" class="btn" style="margin-top:6px;width:100%;background:#00a3c2;">Añadir persona</button>
+      <ul id="personList"></ul>
+      <button id="closeModalBtn" class="btn" style="background:#737373;width:100%;">Cerrar</button>
+    </div>
+  </div>
+
+  <script>
+    let seconds = 0;
+    let timerInterval = null;
+    let isRunning = false;
+
+    const timerDisplay = document.getElementById("timerDisplay");
+    const startBtn = document.getElementById("startBtn");
+    const stopAllBtn = document.getElementById("stopAllBtn");
+    const chooseDirBtn = document.getElementById("chooseDirBtn");
+    const processNameInput = document.getElementById("processNameInput");
+
+    function formatSeconds(sec) {
+      const h = String(Math.floor(sec / 3600)).padStart(2, "0");
+      const m = String(Math.floor((sec % 3600) / 60)).padStart(2, "0");
+      const s = String(sec % 60).padStart(2, "0");
+      return `${h}:${m}:${s}`;
+    }
+
+    function startTimer() {
+      if (isRunning) return;
+      isRunning = true;
+      timerInterval = setInterval(() => {
+        seconds++;
+        timerDisplay.textContent = formatSeconds(seconds);
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      clearInterval(timerInterval);
+      isRunning = false;
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      isRunning = false;
+    }
+
+    startBtn.addEventListener("click", () => {
+      if (!isRunning) {
+        startTimer();
+        startBtn.textContent = "⏸ PAUSE";
+        startBtn.style.background = "#e8a11b";
+      } else {
+        pauseTimer();
+        startBtn.textContent = "▶ RESUME";
+        startBtn.style.background = "#45c1f1";
+      }
+    });
+
+    let registroDirHandle = null;
+
+    async function chooseDirectory() {
+      if (!("showDirectoryPicker" in window)) {
+        alert("Tu navegador no soporta esta función. Se usará la descarga normal.");
+        return;
+      }
+
+      try {
+        registroDirHandle = await window.showDirectoryPicker();
+        alert("Carpeta seleccionada correctamente.");
+      } catch (error) {
+        console.error("Selección de carpeta cancelada o fallida:", error);
+      }
+    }
+
+    async function saveWorkbookToDirectory(wb, fileName) {
+      if (!("showDirectoryPicker" in window)) {
+        XLSX.writeFile(wb, fileName);
+        return;
+      }
+
+      if (!registroDirHandle) {
+        await chooseDirectory();
+      }
+
+      if (!registroDirHandle) {
+        XLSX.writeFile(wb, fileName);
+        return;
+      }
+
+      try {
+        const excelArrayBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const fileHandle = await registroDirHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(excelArrayBuffer);
+        await writable.close();
+        alert(`Archivo guardado correctamente en la carpeta seleccionada:\n${fileName}`);
+      } catch (error) {
+        console.error("Error guardando en carpeta:", error);
+        alert("No se ha podido guardar en la carpeta seleccionada. Se hará la descarga normal.");
+        XLSX.writeFile(wb, fileName);
+      }
+    }
+
+    chooseDirBtn.addEventListener("click", async () => {
+      await chooseDirectory();
+    });
+
+    let personas = ["Of", "Operario 1", "Operario 2", "Mantenimiento"];
+    let tareasBase = [
+      "Prepara aspiradoras rampa salida envasadora",
+      "Prepara etiquetas de box cambio de orden",
+      "Prepara etiquetas de boxes nueva orden",
+      "Cambio de Bobina",
+      "Vaciar linea superior de pipas"
+    ];
+    let registros = [];
+    const tasksBody = document.getElementById("tasksBody");
+    const addTaskBtn = document.getElementById("addTaskBtn");
+    const taskList = document.getElementById("taskList");
+
+    function renderTaskList() {
+      taskList.innerHTML = "";
+      tareasBase.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t;
+        taskList.appendChild(opt);
+      });
+    }
+    renderTaskList();
+
+    function addTaskToCatalog(name) {
+      const clean = name.trim();
+      if (clean && !tareasBase.includes(clean)) {
+        tareasBase.push(clean);
+        renderTaskList();
+      }
+    }
+
+    function createTaskRow(tareaTexto = "") {
+      const tr = document.createElement("tr");
+
+      const tdPersona = document.createElement("td");
+      tdPersona.setAttribute("data-role", "persona");
+      const selPersona = document.createElement("select");
+      personas.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p;
+        opt.textContent = p;
+        selPersona.appendChild(opt);
+      });
+      tdPersona.appendChild(selPersona);
+
+      const tdTarea = document.createElement("td");
+      tdTarea.setAttribute("data-role", "tarea");
+      const inpTarea = document.createElement("input");
+      inpTarea.type = "text";
+      inpTarea.value = tareaTexto;
+      inpTarea.style.width = "100%";
+      inpTarea.setAttribute("list", "taskList");
+      tdTarea.appendChild(inpTarea);
+
+      const tdTipo = document.createElement("td");
+      tdTipo.setAttribute("data-role", "tipo");
+      let tipoSeleccionado = "";
+      const btnVA = document.createElement("button");
+      btnVA.textContent = "VA";
+      btnVA.className = "tag-btn";
+      const btnMUDA = document.createElement("button");
+      btnMUDA.textContent = "MUDA";
+      btnMUDA.className = "tag-btn";
+
+      btnVA.addEventListener("click", () => {
+        tipoSeleccionado = "VA";
+        btnVA.classList.add("active","va");
+        btnMUDA.classList.remove("active","muda");
+        if (tr._tipoWrap) tr._tipoWrap.innerHTML = "<small>Tipo:</small> VA";
+      });
+      btnMUDA.addEventListener("click", () => {
+        tipoSeleccionado = "MUDA";
+        btnMUDA.classList.add("active","muda");
+        btnVA.classList.remove("active","va");
+        if (tr._tipoWrap) tr._tipoWrap.innerHTML = "<small>Tipo:</small> MUDA";
+      });
+
+      tdTipo.appendChild(btnVA);
+      tdTipo.appendChild(document.createTextNode(" "));
+      tdTipo.appendChild(btnMUDA);
+
+      const tdComentario = document.createElement("td");
+      tdComentario.setAttribute("data-role", "comentario");
+      const inpComentario = document.createElement("input");
+      inpComentario.type = "text";
+      inpComentario.style.width = "100%";
+      tdComentario.appendChild(inpComentario);
+
+      const tdInicio = document.createElement("td");
+      tdInicio.textContent = "00:00:00";
+
+      const tdFin = document.createElement("td");
+      tdFin.textContent = "00:00:00";
+
+      const tdBtns = document.createElement("td");
+      const divBtn = document.createElement("div");
+      divBtn.className = "row-btn";
+      const btnPlay = document.createElement("button");
+      btnPlay.textContent = "▶";
+      btnPlay.className = "btn";
+      btnPlay.style.padding = "4px 8px";
+      btnPlay.style.background = "var(--kaizen-red)";
+      const btnStop = document.createElement("button");
+      btnStop.textContent = "■";
+      btnStop.className = "btn";
+      btnStop.style.padding = "4px 8px";
+      btnStop.style.background = "#737373";
+
+      btnPlay.addEventListener("click", () => {
+        if (!isRunning) {
+          alert("Primero inicia el temporizador general.");
+          return;
+        }
+        tdInicio.textContent = formatSeconds(seconds);
+        tdFin.textContent = "00:00:00";
+        addTaskToCatalog(inpTarea.value);
+
+        if (tr._inicioWrap) {
+          tr._inicioWrap.innerHTML = "<small>Inicio:</small> " + tdInicio.textContent;
+        }
+        if (tr._finWrap) {
+          tr._finWrap.innerHTML = "<small>Fin:</small> " + tdFin.textContent;
+        }
+      });
+
+      btnStop.addEventListener("click", () => {
+        if (tdInicio.textContent === "00:00:00") {
+          alert("No se ha iniciado la tarea.");
+          return;
+        }
+        tdFin.textContent = formatSeconds(seconds);
+        registros.push({
+          Persona: selPersona.value,
+          Tarea: inpTarea.value,
+          Tipo: tipoSeleccionado,
+          "Tiempo Inicio": tdInicio.textContent,
+          "Tiempo Fin": tdFin.textContent,
+          Comentario: inpComentario.value
+        });
+        addTaskToCatalog(inpTarea.value);
+
+        if (tr._finWrap) {
+          tr._finWrap.innerHTML = "<small>Fin:</small> " + tdFin.textContent;
+        }
+      });
+
+      divBtn.append(btnPlay, btnStop);
+      tdBtns.appendChild(divBtn);
+
+      const tdOrder = document.createElement("td");
+      const divOrder = document.createElement("div");
+      divOrder.className = "row-btn";
+      const btnUp = document.createElement("button");
+      btnUp.textContent = "↑";
+      btnUp.className = "mini-btn mv";
+      const btnDown = document.createElement("button");
+      btnDown.textContent = "↓";
+      btnDown.className = "mini-btn mv";
+      const btnDel = document.createElement("button");
+      btnDel.textContent = "X";
+      btnDel.className = "mini-btn del";
+
+      btnUp.addEventListener("click", () => {
+        const prev = tr.previousElementSibling;
+        if (prev) tasksBody.insertBefore(tr, prev);
+      });
+      btnDown.addEventListener("click", () => {
+        const next = tr.previousElementSibling;
+        if (next) tasksBody.insertBefore(next, tr);
+      });
+      btnDel.addEventListener("click", () => {
+        const tareaActual = inpTarea.value.trim();
+        if (tareaActual) {
+          registros = registros.filter(r => r.Tarea !== tareaActual);
+        }
+        tasksBody.removeChild(tr);
+      });
+
+      divOrder.append(btnUp, btnDown, btnDel);
+      tdOrder.appendChild(divOrder);
+
+      tr.append(tdPersona, tdTarea, tdTipo, tdComentario, tdInicio, tdFin, tdBtns, tdOrder);
+      tasksBody.appendChild(tr);
+
+      if (window.innerWidth <= 700) {
+        convertRowToMobileLayout(tr);
+      }
+    }
+
+    function convertRowToMobileLayout(tr) {
+      const tds = tr.querySelectorAll("td");
+      const tareaTd = tr.querySelector('td[data-role="tarea"]');
+      const personaTd = tr.querySelector('td[data-role="persona"]');
+      const tipoTd = tr.querySelector('td[data-role="tipo"]');
+      const comentarioTd = tr.querySelector('td[data-role="comentario"]');
+      const inicioTd = tds[4];
+      const finTd = tds[5];
+      const playTd = tds[6];
+      const orderTd = tds[7];
+
+      tr.innerHTML = "";
+      tr.appendChild(tareaTd);
+
+      const line2 = document.createElement("div");
+      line2.className = "mobile-row";
+
+      const personaWrap = document.createElement("div");
+      personaWrap.innerHTML = "<small>Persona:</small>";
+      personaWrap.appendChild(personaTd.firstChild);
+      line2.appendChild(personaWrap);
+
+      const tipoWrap = document.createElement("div");
+      tipoWrap.innerHTML = "<small>Tipo:</small> ";
+      while (tipoTd.firstChild) {
+        tipoWrap.appendChild(tipoTd.firstChild);
+      }
+      line2.appendChild(tipoWrap);
+
+      const inicioWrap = document.createElement("div");
+      inicioWrap.innerHTML = "<small>Inicio:</small> " + inicioTd.textContent;
+      line2.appendChild(inicioWrap);
+
+      const finWrap = document.createElement("div");
+      finWrap.innerHTML = "<small>Fin:</small> " + finTd.textContent;
+      line2.appendChild(finWrap);
+
+      line2.appendChild(playTd.firstChild);
+      line2.appendChild(orderTd.firstChild);
+
+      tr.appendChild(line2);
+      tr.appendChild(comentarioTd);
+
+      tr._inicioWrap = inicioWrap;
+      tr._finWrap = finWrap;
+      tr._tipoWrap = tipoWrap;
+    }
+
+    tareasBase.forEach(t => createTaskRow(t));
+
+    addTaskBtn.addEventListener("click", () => {
+      createTaskRow("");
+      addTaskBtn.scrollIntoView({ behavior: "smooth", block: "end" });
+    });
+
+    stopAllBtn.addEventListener("click", async () => {
+      stopTimer();
+      startBtn.textContent = "▶ START";
+      startBtn.style.background = "#45c1f1";
+
+      if (registros.length === 0) {
+        alert("No hay registros cerrados para descargar.");
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(registros);
+      XLSX.utils.book_append_sheet(wb, ws, "Registros");
+
+      let processName = processNameInput.value.trim();
+      if (!processName) processName = "Proceso";
+
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mmin = String(now.getMinutes()).padStart(2, "0");
+
+      const cleanName = processName.replace(/[^a-zA-Z0-9-_]/g, "_");
+      const fileName = `Registro_${cleanName}_${yyyy}-${mm}-${dd}_${hh}-${mmin}.xlsx`;
+
+      await saveWorkbookToDirectory(wb, fileName);
+    });
+
+    const modal = document.getElementById("personModal");
+    const personList = document.getElementById("personList");
+    const newPersonName = document.getElementById("newPersonName");
+    const addPersonBtn = document.getElementById("addPersonBtn");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const managePeopleBtn = document.getElementById("managePeopleBtn");
+
+    function renderPersonList() {
+      personList.innerHTML = "";
+      personas.forEach((p, i) => {
+        const li = document.createElement("li");
+        li.textContent = p;
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "X";
+        delBtn.onclick = () => {
+          personas.splice(i, 1);
+          renderPersonList();
+        };
+        li.appendChild(delBtn);
+        personList.appendChild(li);
+      });
+    }
+
+    addPersonBtn.onclick = () => {
+      const name = newPersonName.value.trim();
+      if (name && !personas.includes(name)) {
+        personas.push(name);
+        newPersonName.value = "";
+        renderPersonList();
+      }
+    };
+    closeModalBtn.onclick = () => { modal.style.display = "none"; };
+    managePeopleBtn.onclick = () => { renderPersonList(); modal.style.display = "flex"; };
+
+    window.addEventListener("resize", () => {
+      if (window.innerWidth <= 700) {
+        document.querySelectorAll("#tasksBody tr").forEach(tr => {
+          if (!tr._inicioWrap) {
+            convertRowToMobileLayout(tr);
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
